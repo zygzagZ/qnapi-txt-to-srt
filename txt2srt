@@ -1,0 +1,25 @@
+#!/bin/bash
+filename=$1;
+subname=$2;
+# check if file exists 
+if [ -f "$filename" ]; then
+	if [[ $subname == "" ]] || [ ! -f "$subname" ]; then
+		basename=`echo "$filename"|sed -e "s/\.[a-z0-9][a-z0-9]*$//g"`;
+		if [ ! -f "$basename.txt" ]; then 
+			echo "Subtitles file '$subname' nor '$basename.txt' not found!";
+			exit 2
+		fi
+		subname="$basename.txt";
+	fi
+else
+	echo "Movie file '$filename' does not exist" >&2;
+	exit 1
+fi
+newsub=`echo "$subname"|sed -e "s/txt/srt/g"`;
+fps=`fps "$filename"`;
+err=`iconv -f cp1250 -t utf8 "$subname" > "$newsub" 2>1`;  #try to convert from cp1250 to utf8
+if [[ err != "" ]]; then
+	cp "$subname" "$newsub" # if iconv failed (not cp1250) then the file doesn't exist
+fi
+echo "FPS: $fps"
+convertTxt2srt.js "$newsub" "$fps"

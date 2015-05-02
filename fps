@@ -1,0 +1,55 @@
+#!/bin/bash
+filename=$1;
+# check if file exists 
+if [ ! -f "$filename" ]; then
+	echo "Movie file '$filename' does not exist" >&2
+	exit 1
+fi
+# FPS read start 
+### create pipes
+randomin=`mktemp`;
+randomout=`mktemp`;
+rm $randomin $randomout;
+mkfifo $randomin;
+mkfifo $randomout;
+exec 3<> $randomin;
+exec 4<> $randomout;
+### start VLC CLI
+# read stdin from FD #3
+# write stdout to FD #4
+# ignore stderr
+(vlc -I rc --novideo --noaudio --rc-fake-tty -q "$filename" <&3 1>&4 2>/dev/null) &
+
+### wait for command prompt
+while [ 1 ]; do
+	read -n 1 nn <&4
+	if [[ $nn == ">" ]]; then break; fi
+done
+
+### print info & read FPS
+iter=1
+while [[ iter -ne 10 ]]; do
+	iter=$((iter+1));
+	echo -e "info" >&3
+	while [ 1 ]; do	
+		read -t 0.1 nn <&4
+		if [[ $nn == '' ]]; then
+			break;
+		fi
+		nn=`echo $nn | egrep -o "[0-9][0-9]\.[0-9]+" --color=never`
+		if [[ $nn != '' ]]; then
+			fps=$nn;
+			echo quit >&3
+			break;
+		fi
+	done
+	if [[ $fps != '' ]]; then
+		break;
+	fi
+done
+
+### close pipes
+exec 3>&-
+exec 4>&-
+rm $randomin $randomout
+echo $fps
